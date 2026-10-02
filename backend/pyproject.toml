@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ritual-backend"
+version = "0.1.0"
+description = "RITUAL — behavioral science habit platform backend"
+requires-python = ">=3.12"
+dependencies = [
+    # Web framework
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    # Database (async)
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    # Validation / settings
+    # [email] extra is required: src/users/schemas.py uses EmailStr, which
+    # raises ImportError at schema-build time without email-validator.
+    "pydantic[email]>=2.9",
+    "pydantic-settings>=2.6",
+    # Task queue — Valkey broker (Redis-protocol compatible)
+    "celery>=5.4",
+    "valkey>=6.0",           # Valkey Python client (BSD-3)
+    # Auth
+    "ory-kratos-client>=1.2",
+    # HTTP (APNs, FCM, Kratos calls)
+    "httpx>=0.28",
+    # Crypto (APNs JWT signing)
+    "cryptography>=43",
+    "PyJWT>=2.9",
+    # Utilities
+    "python-dateutil>=2.9",
+    "tzdata>=2024.2",        # zoneinfo database on Windows; stdlib zoneinfo elsewhere
+    "orjson>=3.10",          # fast JSON serialisation
+    "structlog>=24",         # structured logging
+    "tenacity>=9",           # retry logic for push dispatchers
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6",
+    "httpx>=0.28",           # TestClient transport
+    "aiosqlite>=0.20",       # in-memory async DB for integration tests
+    "factory-boy>=3.3",
+    "freezegun>=1.5",
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+
+[tool.hatch.build.targets.wheel]
+# `ritual` is the framework-free domain core (SPEC-habit-engine, sleep titration).
+# `src` is the application layer — HTTP, persistence, workers — and imports it.
+# The dependency runs one way only: nothing in `ritual` may import from `src`.
+packages = ["ritual", "src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]

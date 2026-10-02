@@ -1,0 +1,78 @@
+# RITUAL — local development services
+# Runs: Postgres 16, Valkey 7 (not Redis — STACK §9 trap #4), Ory Kratos, Mailpit
+#
+# Usage:
+#   docker compose up -d
+#   docker compose down -v   # wipe volumes
+#
+# The FastAPI app and Celery worker run outside Docker (via uv run) for hot-reload.
+
+services:
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ritual
+      POSTGRES_PASSWORD: ritual
+      POSTGRES_DB: ritual
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ritual"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Valkey 7 (BSD-3, replaces Redis — STACK §9 trap #4) ───────────────────────
+  valkey:
+    image: valkey/valkey:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Ory Kratos (headless auth) ─────────────────────────────────────────────────
+  kratos-migrate:
+    image: oryd/kratos:v1.3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: migrate sql -e --yes
+    environment:
+      DSN: postgres://ritual:ritual@postgres:5432/kratos?sslmode=disable
+    restart: on-failure
+
+  kratos:
+    image: oryd/kratos:v1.3
+    depends_on:
+      - kratos-migrate
+      - mailpit
+    command: serve -c /etc/kratos/config.yml --dev --watch-courier
+    volumes:
+      - ./infra/kratos:/etc/kratos
+    environment:
+      DSN: postgres://ritual:ritual@postgres:5432/kratos?sslmode=disable
+      LOG_LEVEL: info
+    ports:
+      - "4433:4433"   # Public API
+      - "4434:4434"   # Admin API — never exposed externally
+    restart: unless-stopped
+
+  # ── Mailpit (local SMTP for Kratos verification emails) ───────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI → http://localhost:8025
+
+volumes:
+  postgres_data:

@@ -1,0 +1,51 @@
+# RITUAL — Kratos self-service configuration (local dev)
+# Place at backend/infra/kratos/config.yml
+
+version: v1.3.0
+
+dsn: memory  # overridden by DSN env var at runtime
+
+serve:
+  public:
+    base_url: http://localhost:4433/
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:3000   # future web dashboard
+  admin:
+    base_url: http://localhost:4434/
+
+selfservice:
+  default_browser_return_url: http://localhost:3000/
+
+  flows:
+    registration:
+      ui_url: http://localhost:3000/auth/register
+      lifespan: 10m
+    login:
+      ui_url: http://localhost:3000/auth/login
+      lifespan: 10m
+    recovery:
+      enabled: true
+      ui_url: http://localhost:3000/auth/recovery
+    verification:
+      enabled: true
+      ui_url: http://localhost:3000/auth/verify
+
+  methods:
+    password:
+      enabled: true
+    link:
+      enabled: true   # magic-link recovery
+
+identity:
+  default_schema_id: ritual_user
+  schemas:
+    - id: ritual_user
+      url: file:///etc/kratos/schemas/ritual_user.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtps://ritual:ritual@mailpit:1025/?skip_ssl_verify=true
+    from_address: no-reply@ritual.app
+    from_name: RITUAL
